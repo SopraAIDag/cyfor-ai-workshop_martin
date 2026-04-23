@@ -13,8 +13,11 @@ const HealthResponseSchema = z.object({
 
 const ItemSchema = z.object({
   id: z.number().int().openapi({ example: 1 }),
-  title: z.string().min(1).max(120).openapi({ example: 'Build a workshop API' }),
-  createdAt: z.string().datetime().openapi({ example: '2024-01-01T00:00:00.000Z' })
+  title: z.string().min(1).max(120).openapi({ example: 'Meeting room A' }),
+  description: z.string().max(500).nullable().openapi({ example: 'Seats 6, has a whiteboard.' }),
+  category: z.string().min(1).max(40).openapi({ example: 'room' }),
+  createdAt: z.string().datetime().openapi({ example: '2024-01-01T00:00:00.000Z' }),
+  updatedAt: z.string().datetime().openapi({ example: '2024-01-01T00:00:00.000Z' })
 }).openapi('Item')
 
 const ItemListResponseSchema = z.object({
@@ -22,8 +25,16 @@ const ItemListResponseSchema = z.object({
 }).openapi('ItemListResponse')
 
 const CreateItemSchema = z.object({
-  title: z.string().trim().min(1).max(120).openapi({ example: 'Build a workshop API' })
+  title: z.string().trim().min(1).max(120).openapi({ example: 'Meeting room A' }),
+  description: z.string().trim().max(500).optional().openapi({ example: 'Seats 6, has a whiteboard.' }),
+  category: z.string().trim().min(1).max(40).openapi({ example: 'room' })
 }).openapi('CreateItem')
+
+const UpdateItemSchema = z.object({
+  title: z.string().trim().min(1).max(120).openapi({ example: 'Meeting room A' }),
+  description: z.string().trim().max(500).optional().openapi({ example: 'Seats 6, has a whiteboard.' }),
+  category: z.string().trim().min(1).max(40).openapi({ example: 'room' })
+}).openapi('UpdateItem')
 
 const ItemParamsSchema = z.object({
   id: z.coerce.number().int().positive().openapi({
@@ -67,10 +78,20 @@ const healthRoute = createRoute({
   }
 })
 
+const ListItemsQuerySchema = z.object({
+  search: z.string().optional().openapi({
+    param: { name: 'search', in: 'query' },
+    example: 'meeting'
+  })
+}).openapi('ListItemsQuery')
+
 const listItemsRoute = createRoute({
   method: 'get',
   path: '/items',
   tags: ['Items'],
+  request: {
+    query: ListItemsQuerySchema
+  },
   responses: {
     200: {
       description: 'List persisted items',
@@ -109,6 +130,36 @@ const createItemRoute = createRoute({
   }
 })
 
+const updateItemRoute = createRoute({
+  method: 'put',
+  path: '/items/{id}',
+  tags: ['Items'],
+  request: {
+    params: ItemParamsSchema,
+    body: {
+      required: true,
+      content: {
+        'application/json': {
+          schema: UpdateItemSchema
+        }
+      }
+    }
+  },
+  responses: {
+    200: {
+      description: 'Update a persisted item',
+      content: {
+        'application/json': {
+          schema: ItemSchema
+        }
+      }
+    },
+    404: {
+      description: 'Item not found'
+    }
+  }
+})
+
 const deleteItemRoute = createRoute({
   method: 'delete',
   path: '/items/{id}',
@@ -123,10 +174,20 @@ const deleteItemRoute = createRoute({
   }
 })
 
-const toItemResponse = (item: { id: number; title: string; createdAt: Date }) => ({
+const toItemResponse = (item: {
+  id: number
+  title: string
+  description: string | null
+  category: string
+  createdAt: Date
+  updatedAt: Date
+}) => ({
   id: item.id,
   title: item.title,
-  createdAt: item.createdAt.toISOString()
+  description: item.description,
+  category: item.category,
+  createdAt: item.createdAt.toISOString(),
+  updatedAt: item.updatedAt.toISOString()
 })
 
 const defaultCorsOrigins = ['http://localhost:4173', 'http://localhost:5173']
@@ -166,10 +227,10 @@ app.openapi(healthRoute, (c) => {
 })
 
 app.openapi(listItemsRoute, async (c) => {
+  const { search } = c.req.valid('query')
   const items = await prisma.item.findMany({
-    orderBy: {
-      createdAt: 'desc'
-    }
+    where: search ? { title: { contains: search } } : undefined,
+    orderBy: { createdAt: 'desc' }
   })
 
   return c.json({
@@ -178,14 +239,37 @@ app.openapi(listItemsRoute, async (c) => {
 })
 
 app.openapi(createItemRoute, async (c) => {
-  const { title } = c.req.valid('json')
+  const { title, description, category } = c.req.valid('json')
   const item = await prisma.item.create({
     data: {
-      title
+      title,
+      description: description ?? null,
+      category
     }
   })
 
   return c.json(toItemResponse(item), 201)
+})
+
+app.openapi(updateItemRoute, async (c) => {
+  const { id } = c.req.valid('param')
+  const { title, description, category } = c.req.valid('json')
+
+  const existing = await prisma.item.findUnique({ where: { id } })
+  if (!existing) {
+    return c.body(null, 404)
+  }
+
+  const item = await prisma.item.update({
+    where: { id },
+    data: {
+      title,
+      description: description ?? null,
+      category
+    }
+  })
+
+  return c.json(toItemResponse(item), 200)
 })
 
 app.openapi(deleteItemRoute, async (c) => {
