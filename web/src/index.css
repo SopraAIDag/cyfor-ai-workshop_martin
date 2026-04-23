@@ -5,18 +5,8 @@
 }
 
 :root {
-  --fv-black: #262122;
-  --fv-red: #DE0034;
-  --fv-gold: #FECC0B;
-  --fv-orange: #EF6D1E;
-  --fv-white: #FFFFFF;
-  --fv-bg: #F5F5F0;
-  --fv-border: #D8D8D0;
-  --fv-muted: #767672;
-
   color: #262122;
   background-color: #F5F5F0;
-  font-family: Arial, 'Helvetica Neue', sans-serif;
 }
 
 * {
@@ -34,13 +24,10 @@ body {
   min-width: 320px;
   min-height: 100vh;
   background-color: #F5F5F0;
-  font-family: Arial, 'Helvetica Neue', sans-serif;
 }
 
 h1,
 h2,
 h3 {
-  font-family: Arial, 'Helvetica Neue', sans-serif;
-  color: #262122;
   letter-spacing: -0.02em;
 }

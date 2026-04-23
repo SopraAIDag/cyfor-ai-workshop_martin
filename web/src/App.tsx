@@ -1,4 +1,4 @@
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import {
   getGetItemsQueryKey,
   useDeleteItemsId,
@@ -23,12 +23,18 @@ export default function App() {
   const [category, setCategory] = useState("general");
   const [editState, setEditState] = useState<EditState | null>(null);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => clearTimeout(t);
+  }, [search]);
 
   const queryClient = useQueryClient();
   const refreshItems = () =>
     queryClient.invalidateQueries({ queryKey: getGetItemsQueryKey() });
 
-  const searchParam = search.trim() || undefined;
+  const searchParam = debouncedSearch || undefined;
   const itemsQuery = useGetItems({ search: searchParam });
 
   const createItemMutation = usePostItems({
